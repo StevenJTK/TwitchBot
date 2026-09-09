@@ -2,17 +2,16 @@ package twitch;
 
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.chat.events.CommandEvent;
-import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
-import com.github.twitch4j.helix.domain.ChannelInformation;
+import com.github.twitch4j.helix.domain.CreateClipList;
 import com.github.twitch4j.helix.domain.InboundFollowers;
 import com.github.twitch4j.helix.domain.UserList;
+import com.netflix.hystrix.exception.HystrixRuntimeException;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 
 public class Commands {
@@ -33,6 +32,7 @@ public class Commands {
         commandMap.put("lurk", this::handleLurk);
         commandMap.put("unlurk", this::handleUnlurk);
         commandMap.put("followers", this::handleFollowersCheck);
+        commandMap.put("clip", this::handleClips);
     }
 
     public Commands(TwitchClient twitchClient) {
@@ -100,23 +100,22 @@ public class Commands {
 
       twitchClient.getChat().sendMessage(channel, "Amount of followers: " + followerCount);
     }
-/*****************************************************************/
-    private void handleTitleChange(ChannelMessageEvent event) {
-        String message = event.getMessage();
-        String channel = event.getChannel().getName();
 
-        if (!message.startsWith("!title ")) return;
 
-        String newTitle = message.substring("!title ".length()).trim();
-
+    private void handleClips(String channel, CommandEvent event) {
         UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
+
         String broadcasterId = users.getUsers().getFirst().getId();
 
-        twitchClient.getHelix().updateChannelInformation(token, broadcasterId, ChannelInformation.builder()
-                .title(newTitle)
-                .build()).execute();
+        try {
+            CreateClipList clipData = twitchClient.getHelix().createClip(token, broadcasterId, false).execute();
+            clipData.getData().forEach(clip -> {
+                System.out.println("Clip created!" + clip.getId());
+            });
 
-        twitchClient.getChat().sendMessage(channel, "Title updated to: " + newTitle);
-
+        } catch (HystrixRuntimeException e) {
+            System.out.println("Could not create clip" + e.getCause());
+            twitchClient.getChat().sendMessage(channel, "WE AINT LIVE");
+        }
     }
 }

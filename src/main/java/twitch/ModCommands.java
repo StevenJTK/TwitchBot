@@ -1,5 +1,6 @@
 package twitch;
 
+
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.common.enums.CommandPermission;
@@ -28,7 +29,6 @@ public class ModCommands {
     public void ModCom() {
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
             String message = event.getMessage();
-            String user = event.getUser().getName();
 
             String command = message.split(" ", 2)[0].substring(1).toLowerCase();
 
@@ -43,17 +43,16 @@ public class ModCommands {
         modCommandMap.put("game", this::handleCategoryChange);
     }
 
-    private void hasPerms(ChannelMessageEvent event) {
-        boolean isModOrBroadCaster = event.getPermissions().contains(CommandPermission.MODERATOR) || event.getPermissions().contains(CommandPermission.BROADCASTER);
-        if(!isModOrBroadCaster) return;
+    private boolean hasPerms(ChannelMessageEvent event) {
+       return event.getPermissions().contains(CommandPermission.MODERATOR) || event.getPermissions().contains(CommandPermission.BROADCASTER);
     }
 
+    /*****************************COMMANDS***********************************************/
     private void handleTitleChange(ChannelMessageEvent event) {
+        if(!hasPerms(event)) return;
+
         String message = event.getMessage();
         String channel = event.getChannel().getName();
-
-        hasPerms(event);
-
         String newTitle = message.substring("!title".length()).trim();
 
         UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
@@ -92,6 +91,5 @@ public class ModCommands {
         twitchClient.getChat().sendMessage(channel, "Game is now: " + categoryTitle);
 
     }
-
 
 }

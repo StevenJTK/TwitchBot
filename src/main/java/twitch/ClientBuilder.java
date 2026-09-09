@@ -26,6 +26,8 @@ public class ClientBuilder {
             .withChatAccount(credential)
             .withDefaultEventHandler(SimpleEventHandler.class)
             .withCommandTrigger("!")
+            .withEnableEventSocket(true)
+            .withDefaultAuthToken(new OAuth2Credential("twitch", token))
             .build();
 
     EventManager eventManager = twitchClient.getEventManager();
