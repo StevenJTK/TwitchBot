@@ -3,6 +3,7 @@ package twitch;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.chat.events.CommandEvent;
 import com.github.twitch4j.helix.domain.CreateClipList;
+import com.github.twitch4j.helix.domain.GameList;
 import com.github.twitch4j.helix.domain.InboundFollowers;
 import com.github.twitch4j.helix.domain.UserList;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
@@ -32,7 +33,7 @@ public class Commands {
         commandMap.put("lurk", this::handleLurk);
         commandMap.put("unlurk", this::handleUnlurk);
         commandMap.put("followers", this::handleFollowersCheck);
-        commandMap.put("clip", this::handleClips);
+        commandMap.put("clip", this::handleCreateClips);
     }
 
     public Commands(TwitchClient twitchClient) {
@@ -102,7 +103,7 @@ public class Commands {
     }
 
 
-    private void handleClips(String channel, CommandEvent event) {
+    private void handleCreateClips(String channel, CommandEvent event) {
         UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
 
         String broadcasterId = users.getUsers().getFirst().getId();
@@ -113,9 +114,11 @@ public class Commands {
                 System.out.println("Clip created!" + clip.getId());
             });
 
-        } catch (HystrixRuntimeException e) {
+        } catch (HystrixRuntimeException e) { // if channel note live = not live message / if clip could not be created seperate message?
             System.out.println("Could not create clip" + e.getCause());
             twitchClient.getChat().sendMessage(channel, "WE AINT LIVE");
+        } finally {
+            System.out.println("Cleaning up");
         }
     }
 }

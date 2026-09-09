@@ -4,9 +4,8 @@ package twitch;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.common.enums.CommandPermission;
-import com.github.twitch4j.helix.domain.ChannelInformation;
-import com.github.twitch4j.helix.domain.GameList;
-import com.github.twitch4j.helix.domain.UserList;
+import com.github.twitch4j.helix.domain.*;
+import com.netflix.hystrix.exception.HystrixRuntimeException;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.util.Collections;
@@ -19,6 +18,7 @@ public class ModCommands {
     Dotenv dotenv = Dotenv.load();
     private final String token = dotenv.get("ACCESS_TOKEN");
     private final Map<String, Consumer<ChannelMessageEvent>> modCommandMap = new HashMap<>();
+    private final Map<String, String> customCommandsMap = new HashMap<>();
     private final TwitchClient twitchClient;
 
     public ModCommands(TwitchClient twitchClient) {
@@ -34,6 +34,8 @@ public class ModCommands {
 
             if (modCommandMap.containsKey(command)) {
                 modCommandMap.get(command).accept(event);
+            } else {
+                handleCustomCommand(event);
             }
         });
     }
@@ -41,6 +43,8 @@ public class ModCommands {
     private void addToModMap() {
         modCommandMap.put("title", this::handleTitleChange);
         modCommandMap.put("game", this::handleCategoryChange);
+        modCommandMap.put("last", this::handleGetClip);
+        modCommandMap.put("addcom", this::addCustomCommands);
     }
 
     private boolean hasPerms(ChannelMessageEvent event) {
@@ -66,11 +70,11 @@ public class ModCommands {
     }
 
     private void handleCategoryChange(ChannelMessageEvent event) {
+        if(!hasPerms(event)) return;
+
         String channel = event.getChannel().getName();
         String message = event.getMessage();
         String categoryTitle = message.substring("!game ".length()).trim();
-
-        hasPerms(event);
 
         UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
 
@@ -90,6 +94,70 @@ public class ModCommands {
 
         twitchClient.getChat().sendMessage(channel, "Game is now: " + categoryTitle);
 
+    }
+
+    private void handleGetClip(ChannelMessageEvent event) {
+        String channel = event.getChannel().getName();
+        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
+        String broadcasterId = users.getUsers().getFirst().getId();
+
+        try {
+            ClipList clipList = twitchClient.getHelix().getClips(token, broadcasterId, null, null, null, null,
+                    1, null, null, null).execute();
+
+            clipList.getData().forEach(clip -> {
+                String clipURL = "https://clips.twitch.tv/" + clip.getId();
+                System.out.println("Clip found: " + clip.getId());
+                twitchClient.getChat().sendMessage(channel, "Clip found: " + clipURL);
+            });
+
+        } catch (HystrixRuntimeException e) {
+            System.out.println("Could not fetch clip" + e.getCause());
+            twitchClient.getChat().sendMessage(channel, "Clip was not found.");
+        } finally {
+            System.out.println("Cleaning up");
+        }
+
+    }
+
+
+    private void addCustomCommands(ChannelMessageEvent event) {
+        if (!hasPerms(event)) return;
+
+        String channel = event.getChannel().getName();
+        String message = event.getMessage();
+
+        if (message.startsWith("!addcom")) {
+            String[] parts = message.split(" ", 3);
+
+            if (parts.length < 3) {
+                twitchClient.getChat().sendMessage(channel, "!addcom <name> <response>");
+                return;
+            }
+
+            String commandName = parts[1].startsWith("!") ? parts[1].substring(1) : parts[1];
+            commandName = commandName.toLowerCase();
+            String response = parts[2];
+
+            customCommandsMap.put(commandName, response);
+            twitchClient.getChat().sendMessage(channel, "Command !" + commandName + " added!");
+        }
+    }
+
+    private void handleCustomCommand(ChannelMessageEvent event) {
+        String channel = event.getChannel().getName();
+        String message = event.getMessage();
+
+        if (message == null || !message.startsWith("!") || message.length() < 2) {
+            return;
+        }
+
+        String commandTrigger = message.split(" ", 2)[0].substring(1).toLowerCase();
+
+        if (customCommandsMap.containsKey(commandTrigger)) {
+            String response = customCommandsMap.get(commandTrigger);
+            twitchClient.getChat().sendMessage(channel, response);
+        }
     }
 
 }
