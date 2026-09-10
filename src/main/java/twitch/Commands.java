@@ -9,6 +9,10 @@ import com.github.twitch4j.helix.domain.UserList;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 import io.github.cdimascio.dotenv.Dotenv;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +27,9 @@ public class Commands {
     private final Map<String, BiConsumer<String, CommandEvent>> commandMap = new HashMap<>();
     private final Map<String, Long> cooldownTimer = new HashMap<>();
     private static final long COOLDOWN_MS = 5000;
+    // create map to cache broadcaster IDs
+    // create method grabbing broadcaster ID and storing in said map
+    // swap out broadcaster id in each method and removing hard coded values
 
 
     private void addToMap() {
@@ -34,6 +41,7 @@ public class Commands {
         commandMap.put("unlurk", this::handleUnlurk);
         commandMap.put("followers", this::handleFollowersCheck);
         commandMap.put("clip", this::handleCreateClips);
+        commandMap.put("followage", this::handleFollowAge);
     }
 
     public Commands(TwitchClient twitchClient) {
@@ -120,5 +128,37 @@ public class Commands {
         } finally {
             System.out.println("Cleaning up");
         }
+    }
+
+
+    private void handleFollowAge(String channel, CommandEvent event) {
+
+        String user = event.getUser().getId();
+        String username = event.getUser().getName();
+        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
+        String broadcasterId = users.getUsers().getFirst().getId();
+
+        InboundFollowers result = twitchClient.getHelix()
+                .getChannelFollowers(token, broadcasterId, user, null, null ).execute();
+
+        if(user.equals(broadcasterId)) {
+            twitchClient.getChat().sendMessage(channel, "Broadcasters do not follow themselves silly!");
+            return;
+        }
+
+        if(result.getFollows().isEmpty()) {
+            twitchClient.getChat().sendMessage(channel, "You're not following this channel. Follow or else!");
+            return;
+        }
+
+        Instant followedAt = result.getFollows().getFirst().getFollowedAt();
+        LocalDate followDate = followedAt.atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate now = LocalDate.now(ZoneOffset.UTC);
+        Period period = Period.between(followDate, now);
+
+        String results = String.format("%d years, %d months, %d days", // convert to stringbuilder?
+                period.getYears(), period.getMonths(), period.getDays());
+        twitchClient.getChat().sendMessage(channel, "@" + username + " You've been following since " + results);
+
     }
 }
