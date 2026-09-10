@@ -10,6 +10,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -45,6 +46,7 @@ public class ModCommands {
         modCommandMap.put("game", this::handleCategoryChange);
         modCommandMap.put("last", this::handleGetClip);
         modCommandMap.put("addcom", this::addCustomCommands);
+        modCommandMap.put("delcom", this:: deleteCustomCommands);
     }
 
     private boolean hasPerms(ChannelMessageEvent event) {
@@ -126,12 +128,14 @@ public class ModCommands {
 
         String channel = event.getChannel().getName();
         String message = event.getMessage();
+        String user = event.getUser().getName();
+
 
         if (message.startsWith("!addcom")) {
             String[] parts = message.split(" ", 3);
 
             if (parts.length < 3) {
-                twitchClient.getChat().sendMessage(channel, "!addcom <name> <response>");
+                twitchClient.getChat().sendMessage(channel, "@" + user + " Template: !addcom <name> <response>");
                 return;
             }
 
@@ -140,8 +144,35 @@ public class ModCommands {
             String response = parts[2];
 
             customCommandsMap.put(commandName, response);
-            twitchClient.getChat().sendMessage(channel, "Command !" + commandName + " added!");
+            twitchClient.getChat().sendMessage(channel, "@" + user + " Command !" + commandName + " added!");
         }
+    }
+
+    private void deleteCustomCommands(ChannelMessageEvent event) {
+        if(!hasPerms(event)) return;
+
+        String channel = event.getChannel().getName();
+        String user =  event.getChannel().getName();
+        String message = event.getMessage();
+
+        String[] parts = message.split(" ", 2);
+
+        if(parts.length < 2) {
+            twitchClient.getChat().sendMessage(channel, "@" + user + " Template: !delcom <name>");
+            return;
+        }
+
+        String commandName = parts[1].startsWith("!") ? parts[1].substring(1) : parts[1];
+        commandName = commandName.toLowerCase();
+
+
+        if (!customCommandsMap.containsKey(commandName)) {
+            twitchClient.getChat().sendMessage(channel, "@" + user +" Command " + commandName + " does not exist");
+            return;
+        }
+
+        customCommandsMap.remove(commandName);
+        twitchClient.getChat().sendMessage(channel,  "@" + user + " Command " + commandName +  " has been deleted");
     }
 
     private void handleCustomCommand(ChannelMessageEvent event) {
