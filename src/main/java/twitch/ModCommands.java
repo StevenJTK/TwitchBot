@@ -17,11 +17,12 @@ public class ModCommands {
 
     Dotenv dotenv = Dotenv.load();
     private final String token = dotenv.get("ACCESS_TOKEN");
+    private BroadcasterId broadID;
     private final Map<String, Consumer<ChannelMessageEvent>> modCommandMap = new HashMap<>();
     private final Map<String, String> customCommandsMap = new HashMap<>();
     private final TwitchClient twitchClient;
 
-    public ModCommands(TwitchClient twitchClient) {
+    public ModCommands(TwitchClient twitchClient, BroadcasterId broadID) {
         this.twitchClient = twitchClient;
         addToModMap();
     }
@@ -60,8 +61,7 @@ public class ModCommands {
         String channel = event.getChannel().getName();
         String newTitle = message.substring("!title".length()).trim();
 
-        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
-        String broadcasterId = users.getUsers().getFirst().getId();
+        String broadcasterId = broadID.getBroadcasterId(channel);
 
         twitchClient.getHelix().updateChannelInformation(token, broadcasterId, ChannelInformation.builder()
                 .title(newTitle)
@@ -77,8 +77,6 @@ public class ModCommands {
         String message = event.getMessage();
         String categoryTitle = message.substring("!game ".length()).trim();
 
-        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
-
         GameList games = twitchClient.getHelix().getGames(token, null, Collections.singletonList(categoryTitle), null).execute();
 
         if(games.getGames().isEmpty()) {
@@ -87,7 +85,7 @@ public class ModCommands {
         }
 
         String gameId = games.getGames().getFirst().getId();
-        String broadcasterId = users.getUsers().getFirst().getId();
+        String broadcasterId = broadID.getBroadcasterId(channel);
 
         twitchClient.getHelix().updateChannelInformation(token, broadcasterId, ChannelInformation.builder()
                 .gameId(gameId)
@@ -97,10 +95,10 @@ public class ModCommands {
 
     }
 
+    // defaults to most viewed clip
     private void handleGetClip(ChannelMessageEvent event) {
         String channel = event.getChannel().getName();
-        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
-        String broadcasterId = users.getUsers().getFirst().getId();
+        String broadcasterId = broadID.getBroadcasterId(channel);
 
         try {
             ClipList clipList = twitchClient.getHelix().getClips(token, broadcasterId, null, null, null, null,

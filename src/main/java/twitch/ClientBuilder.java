@@ -32,11 +32,12 @@ public class ClientBuilder {
 
     EventManager eventManager = twitchClient.getEventManager();
 
-    Commands commands = new Commands(twitchClient);
-    ModCommands mcmd = new ModCommands(twitchClient);
+    BroadcasterId broadID = new BroadcasterId(twitchClient);
+    Commands commands = new Commands(twitchClient, broadID);
+    ModCommands mcmd = new ModCommands(twitchClient, broadID);
 
     public void initiate() {
-        joinChannel("SirUncleIroh");
+        joinChannel("SirUncleIroh"); // refactor this to take any channel
         eventListeners();
         registerHandlers();
         spyChat();

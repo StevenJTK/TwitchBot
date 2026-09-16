@@ -2,10 +2,7 @@ package twitch;
 
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.chat.events.CommandEvent;
-import com.github.twitch4j.helix.domain.CreateClipList;
-import com.github.twitch4j.helix.domain.GameList;
-import com.github.twitch4j.helix.domain.InboundFollowers;
-import com.github.twitch4j.helix.domain.UserList;
+import com.github.twitch4j.helix.domain.*;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 import io.github.cdimascio.dotenv.Dotenv;
 
@@ -24,11 +21,12 @@ public class Commands {
     Dotenv dotenv = Dotenv.load();
     private final String token = dotenv.get("ACCESS_TOKEN");
     private final TwitchClient twitchClient;
+    private final BroadcasterId broadID;
     private final Map<String, BiConsumer<String, CommandEvent>> commandMap = new HashMap<>();
     private final Map<String, Long> cooldownTimer = new HashMap<>();
     private static final long COOLDOWN_MS = 5000;
-    // create map to cache broadcaster IDs
-    // create method grabbing broadcaster ID and storing in said map
+
+
     // swap out broadcaster id in each method and removing hard coded values
 
 
@@ -44,8 +42,9 @@ public class Commands {
         commandMap.put("followage", this::handleFollowAge);
     }
 
-    public Commands(TwitchClient twitchClient) {
+    public Commands(TwitchClient twitchClient, BroadcasterId broadID) {
         this.twitchClient = twitchClient;
+        this.broadID = broadID;
         addToMap();
     }
 
@@ -98,7 +97,7 @@ public class Commands {
     }
 
     private void handleFollowersCheck(String channel, CommandEvent event) {
-      UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
+      UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList(channel)).execute();
 
         String broadcasterId = users.getUsers().getFirst().getId();
 
@@ -112,19 +111,25 @@ public class Commands {
 
 
     private void handleCreateClips(String channel, CommandEvent event) {
-        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
+        StreamList streams = twitchClient.getHelix().getStreams(token, null, null, 1, null,
+                null, null, Collections.singletonList(channel)).execute();
 
-        String broadcasterId = users.getUsers().getFirst().getId();
+        String id = broadID.getBroadcasterId(channel);
+
+        if(streams.getStreams().isEmpty()) {
+            twitchClient.getChat().sendMessage(channel, "Broadcaster is not live.");
+            return;
+        }
 
         try {
-            CreateClipList clipData = twitchClient.getHelix().createClip(token, broadcasterId, false).execute();
+            CreateClipList clipData = twitchClient.getHelix().createClip(token, id, false).execute();
             clipData.getData().forEach(clip -> {
                 System.out.println("Clip created!" + clip.getId());
             });
 
-        } catch (HystrixRuntimeException e) { // if channel note live = not live message / if clip could not be created seperate message?
+        } catch (HystrixRuntimeException e) {
             System.out.println("Could not create clip" + e.getCause());
-            twitchClient.getChat().sendMessage(channel, "WE AINT LIVE");
+            twitchClient.getChat().sendMessage(channel, "Clip could not be created.");
         } finally {
             System.out.println("Cleaning up");
         }
@@ -132,16 +137,14 @@ public class Commands {
 
 
     private void handleFollowAge(String channel, CommandEvent event) {
-
         String user = event.getUser().getId();
         String username = event.getUser().getName();
-        UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList("SirUncleIroh")).execute();
-        String broadcasterId = users.getUsers().getFirst().getId();
+        String id = broadID.getBroadcasterId(channel);
 
         InboundFollowers result = twitchClient.getHelix()
-                .getChannelFollowers(token, broadcasterId, user, null, null ).execute();
+                .getChannelFollowers(token, id, user, null, null ).execute();
 
-        if(user.equals(broadcasterId)) {
+        if(user.equals(id)) {
             twitchClient.getChat().sendMessage(channel, "Broadcasters do not follow themselves silly!");
             return;
         }
