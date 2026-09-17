@@ -7,6 +7,7 @@ import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.chat.events.channel.FollowEvent;
+import com.github.twitch4j.events.ChannelGoLiveEvent;
 import io.github.cdimascio.dotenv.Dotenv;
 
 public class ClientBuilder {
@@ -35,6 +36,7 @@ public class ClientBuilder {
     BroadcasterId broadID = new BroadcasterId(twitchClient);
     Commands commands = new Commands(twitchClient, broadID);
     ModCommands mcmd = new ModCommands(twitchClient, broadID);
+    LiveEvent liveEvent = new LiveEvent(twitchClient, broadID);
 
     public void initiate() {
         joinChannel("SirUncleIroh"); // refactor this to take any channel
@@ -43,6 +45,7 @@ public class ClientBuilder {
         spyChat();
         commands.Command();
         mcmd.ModCom();
+        liveEvent.monitorChannel("SirUncleIroh");
     }
 
 

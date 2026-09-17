@@ -27,9 +27,6 @@ public class Commands {
     private static final long COOLDOWN_MS = 5000;
 
 
-    // swap out broadcaster id in each method and removing hard coded values
-
-
     private void addToMap() {
         commandMap.put("ping", this::handlePing);
         commandMap.put("gondor", this::handleGondor);
