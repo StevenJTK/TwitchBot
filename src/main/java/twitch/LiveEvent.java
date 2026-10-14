@@ -18,7 +18,7 @@ public class LiveEvent {
         liveListener();
     }
 
-
+    // works - test again tho
     private void liveListener() {
         eventManager.onEvent(ChannelGoLiveEvent.class, event -> {
             String channel = event.getChannel().getName();
@@ -33,7 +33,7 @@ public class LiveEvent {
         });
     }
 
-    // Future Test
+    // Future Test - works add custom message
     public void monitorChannel(String channel) {
         String broadcasterId = broadID.getBroadcasterId(channel);
 

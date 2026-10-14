@@ -65,6 +65,14 @@ public class Commands {
         return (System.currentTimeMillis() - cd) < COOLDOWN_MS;
     }
 
+    private String getUsername(CommandEvent event) {
+        return event.getUser().getName();
+    }
+
+    private String getUserID(CommandEvent event) {
+        return event.getUser().getId();
+    }
+
     /************* COMMANDS *************/
 
     private void handlePing(String channel, CommandEvent event) {
@@ -84,19 +92,17 @@ public class Commands {
     }
 
     private void handleLurk(String channel, CommandEvent event) {
-        String username = event.getUser().getName();
+        String username = getUsername(event);
         twitchClient.getChat().sendMessage(channel, "@" + username + " Thank you for the lurk!");
     }
 
     private void handleUnlurk(String channel, CommandEvent event) {
-        String username = event.getUser().getName();
+        String username = getUsername(event);
         twitchClient.getChat().sendMessage(channel, "@" + username + " Welcome back! <3");
     }
 
     private void handleFollowersCheck(String channel, CommandEvent event) {
-      UserList users = twitchClient.getHelix().getUsers(token, null, Collections.singletonList(channel)).execute();
-
-        String broadcasterId = users.getUsers().getFirst().getId();
+        String broadcasterId = broadID.getBroadcasterId(channel);
 
         InboundFollowers result = twitchClient.getHelix()
               .getChannelFollowers(token, broadcasterId, null, 1, null ).execute();
@@ -112,6 +118,7 @@ public class Commands {
                 null, null, Collections.singletonList(channel)).execute();
 
         String id = broadID.getBroadcasterId(channel);
+        String username = getUsername(event);
 
         if(streams.getStreams().isEmpty()) {
             twitchClient.getChat().sendMessage(channel, "Broadcaster is not live.");
@@ -121,11 +128,10 @@ public class Commands {
         try {
             CreateClipList clipData = twitchClient.getHelix().createClip(token, id, false).execute();
             clipData.getData().forEach(clip -> {
-                System.out.println("Clip created!" + clip.getId());
+                twitchClient.getChat().sendMessage(channel, "@" + username + " Clip created!");
             });
 
         } catch (HystrixRuntimeException e) {
-            System.out.println("Could not create clip" + e.getCause());
             twitchClient.getChat().sendMessage(channel, "Clip could not be created.");
         } finally {
             System.out.println("Cleaning up");
@@ -134,20 +140,20 @@ public class Commands {
 
 
     private void handleFollowAge(String channel, CommandEvent event) {
-        String user = event.getUser().getId();
-        String username = event.getUser().getName();
+        String userID = getUserID(event);
+        String username = getUsername(event);
         String id = broadID.getBroadcasterId(channel);
 
         InboundFollowers result = twitchClient.getHelix()
-                .getChannelFollowers(token, id, user, null, null ).execute();
+                .getChannelFollowers(token, id, userID, null, null ).execute();
 
-        if(user.equals(id)) {
+        if(userID.equals(id)) {
             twitchClient.getChat().sendMessage(channel, "Broadcasters do not follow themselves silly!");
             return;
         }
 
         if(result.getFollows().isEmpty()) {
-            twitchClient.getChat().sendMessage(channel, "You're not following this channel. Follow or else!");
+            twitchClient.getChat().sendMessage(channel,  "@" + userID + " You're not following this channel. Follow or else!");
             return;
         }
 
