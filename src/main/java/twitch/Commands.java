@@ -92,20 +92,16 @@ public class Commands {
     }
 
     private void handleLurk(String channel, CommandEvent event) {
-        String username = getUsername(event);
-        twitchClient.getChat().sendMessage(channel, "@" + username + " Thank you for the lurk!");
+        twitchClient.getChat().sendMessage(channel, "@" + getUsername(event) + " Thank you for the lurk!");
     }
 
     private void handleUnlurk(String channel, CommandEvent event) {
-        String username = getUsername(event);
-        twitchClient.getChat().sendMessage(channel, "@" + username + " Welcome back! <3");
+        twitchClient.getChat().sendMessage(channel, "@" + getUsername(event) + " Welcome back! <3");
     }
 
     private void handleFollowersCheck(String channel, CommandEvent event) {
-        String broadcasterId = broadID.getBroadcasterId(channel);
-
         InboundFollowers result = twitchClient.getHelix()
-              .getChannelFollowers(token, broadcasterId, null, 1, null ).execute();
+              .getChannelFollowers(token, broadID.getBroadcasterId(channel), null, 1, null ).execute();
 
       int followerCount = result.getTotal();
 
@@ -117,18 +113,15 @@ public class Commands {
         StreamList streams = twitchClient.getHelix().getStreams(token, null, null, 1, null,
                 null, null, Collections.singletonList(channel)).execute();
 
-        String id = broadID.getBroadcasterId(channel);
-        String username = getUsername(event);
-
         if(streams.getStreams().isEmpty()) {
             twitchClient.getChat().sendMessage(channel, "Broadcaster is not live.");
             return;
         }
 
         try {
-            CreateClipList clipData = twitchClient.getHelix().createClip(token, id, false).execute();
+            CreateClipList clipData = twitchClient.getHelix().createClip(token, broadID.getBroadcasterId(channel), false).execute();
             clipData.getData().forEach(clip -> {
-                twitchClient.getChat().sendMessage(channel, "@" + username + " Clip created!");
+                twitchClient.getChat().sendMessage(channel, "@" + getUsername(event) + " Clip created!");
             });
 
         } catch (HystrixRuntimeException e) {
@@ -140,20 +133,16 @@ public class Commands {
 
 
     private void handleFollowAge(String channel, CommandEvent event) {
-        String userID = getUserID(event);
-        String username = getUsername(event);
-        String id = broadID.getBroadcasterId(channel);
-
         InboundFollowers result = twitchClient.getHelix()
-                .getChannelFollowers(token, id, userID, null, null ).execute();
+                .getChannelFollowers(token, broadID.getBroadcasterId(channel), getUserID(event), null, null ).execute();
 
-        if(userID.equals(id)) {
+        if(getUserID(event).equals(broadID.getBroadcasterId(channel))) {
             twitchClient.getChat().sendMessage(channel, "Broadcasters do not follow themselves silly!");
             return;
         }
 
         if(result.getFollows().isEmpty()) {
-            twitchClient.getChat().sendMessage(channel,  "@" + userID + " You're not following this channel. Follow or else!");
+            twitchClient.getChat().sendMessage(channel,  "@" + getUserID(event) + " You're not following this channel. Follow or else!");
             return;
         }
 
@@ -164,7 +153,7 @@ public class Commands {
 
         String results = String.format("%d years, %d months, %d days", // convert to stringbuilder?
                 period.getYears(), period.getMonths(), period.getDays());
-        twitchClient.getChat().sendMessage(channel, "@" + username + " You've been following since " + results);
+        twitchClient.getChat().sendMessage(channel, "@" + getUsername(event) + " You've been following since " + results);
 
     }
 }
