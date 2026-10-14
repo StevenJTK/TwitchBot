@@ -53,66 +53,69 @@ public class ModCommands {
        return event.getPermissions().contains(CommandPermission.MODERATOR) || event.getPermissions().contains(CommandPermission.BROADCASTER);
     }
 
+    private String getMessage(ChannelMessageEvent event) {
+        return event.getMessage();
+    }
+
+    private String getChannel(ChannelMessageEvent event) {
+        return event.getChannel().getName();
+    }
+
+    private String getUsername(ChannelMessageEvent event) {
+        return event.getUser().getName();
+    }
+
     /*****************************COMMANDS***********************************************/
     private void handleTitleChange(ChannelMessageEvent event) {
         if(!hasPerms(event)) return;
 
-        String message = event.getMessage();
-        String channel = event.getChannel().getName();
-        String newTitle = message.substring("!title".length()).trim();
+        String newTitle = getMessage(event).substring("!title".length()).trim();
 
-        String broadcasterId = broadID.getBroadcasterId(channel);
-
-        twitchClient.getHelix().updateChannelInformation(token, broadcasterId, ChannelInformation.builder()
+        twitchClient.getHelix().updateChannelInformation(token, broadID.getBroadcasterId(getChannel(event)), ChannelInformation.builder()
                 .title(newTitle)
                 .build()).execute();
 
-        twitchClient.getChat().sendMessage(channel, "Title is now: " + newTitle);
+        twitchClient.getChat().sendMessage(getChannel(event), "Title is now: " + newTitle);
     }
 
     private void handleCategoryChange(ChannelMessageEvent event) {
         if(!hasPerms(event)) return;
 
-        String channel = event.getChannel().getName();
-        String message = event.getMessage();
-        String categoryTitle = message.substring("!game ".length()).trim();
+        String categoryTitle = getMessage(event).substring("!game ".length()).trim();
 
         GameList games = twitchClient.getHelix().getGames(token, null, Collections.singletonList(categoryTitle), null).execute();
 
         if(games.getGames().isEmpty()) {
-            twitchClient.getChat().sendMessage(channel, "Category not found: " + categoryTitle);
+            twitchClient.getChat().sendMessage(getChannel(event), "Category not found: " + categoryTitle);
             return;
         }
 
         String gameId = games.getGames().getFirst().getId();
-        String broadcasterId = broadID.getBroadcasterId(channel);
 
-        twitchClient.getHelix().updateChannelInformation(token, broadcasterId, ChannelInformation.builder()
+        twitchClient.getHelix().updateChannelInformation(token, broadID.getBroadcasterId(getChannel(event)), ChannelInformation.builder()
                 .gameId(gameId)
                 .build()).execute();
 
-        twitchClient.getChat().sendMessage(channel, "Game is now: " + categoryTitle);
+        twitchClient.getChat().sendMessage(getChannel(event), "Game is now: " + categoryTitle);
 
     }
 
-    // defaults to most viewed clip
+    // This token along with title & game change has expired?
     private void handleGetClip(ChannelMessageEvent event) {
-        String channel = event.getChannel().getName();
-        String broadcasterId = broadID.getBroadcasterId(channel);
 
         try {
-            ClipList clipList = twitchClient.getHelix().getClips(token, broadcasterId, null, null, null, null,
+            ClipList clipList = twitchClient.getHelix().getClips(token, broadID.getBroadcasterId(getChannel(event)), null, null, null, null,
                     1, null, null, null).execute();
 
             clipList.getData().forEach(clip -> {
                 String clipURL = "https://clips.twitch.tv/" + clip.getId();
                 System.out.println("Clip found: " + clip.getId());
-                twitchClient.getChat().sendMessage(channel, "Clip found: " + clipURL);
+                twitchClient.getChat().sendMessage(getChannel(event), "Clip found: " + clipURL);
             });
 
         } catch (HystrixRuntimeException e) {
             System.out.println("Could not fetch clip" + e.getCause());
-            twitchClient.getChat().sendMessage(channel, "Clip was not found.");
+            twitchClient.getChat().sendMessage(getChannel(event), "Clip was not found.");
         } finally {
             System.out.println("Cleaning up");
         }
@@ -123,16 +126,11 @@ public class ModCommands {
     private void addCustomCommands(ChannelMessageEvent event) {
         if (!hasPerms(event)) return;
 
-        String channel = event.getChannel().getName();
-        String message = event.getMessage();
-        String user = event.getUser().getName();
-
-
-        if (message.startsWith("!addcom")) {
-            String[] parts = message.split(" ", 3);
+        if (getMessage(event).startsWith("!addcom")) {
+            String[] parts = getMessage(event).split(" ", 3);
 
             if (parts.length < 3) {
-                twitchClient.getChat().sendMessage(channel, "@" + user + " Template: !addcom <name> <response>");
+                twitchClient.getChat().sendMessage(getChannel(event), "@" + getUsername(event) + " Template: !addcom <name> <response>");
                 return;
             }
 
@@ -141,21 +139,17 @@ public class ModCommands {
             String response = parts[2];
 
             customCommandsMap.put(commandName, response);
-            twitchClient.getChat().sendMessage(channel, "@" + user + " Command !" + commandName + " added!");
+            twitchClient.getChat().sendMessage(getChannel(event), "@" + getUsername(event) + " Command !" + commandName + " added!");
         }
     }
 
     private void deleteCustomCommands(ChannelMessageEvent event) {
         if(!hasPerms(event)) return;
 
-        String channel = event.getChannel().getName();
-        String user =  event.getChannel().getName();
-        String message = event.getMessage();
-
-        String[] parts = message.split(" ", 2);
+        String[] parts = getMessage(event).split(" ", 2);
 
         if(parts.length < 2) {
-            twitchClient.getChat().sendMessage(channel, "@" + user + " Template: !delcom <name>");
+            twitchClient.getChat().sendMessage(getChannel(event), "@" + getUsername(event) + " Template: !delcom <name>");
             return;
         }
 
@@ -164,27 +158,24 @@ public class ModCommands {
 
 
         if (!customCommandsMap.containsKey(commandName)) {
-            twitchClient.getChat().sendMessage(channel, "@" + user +" Command " + commandName + " does not exist");
+            twitchClient.getChat().sendMessage(getChannel(event), "@" + getChannel(event) +" Command " + commandName + " does not exist");
             return;
         }
 
         customCommandsMap.remove(commandName);
-        twitchClient.getChat().sendMessage(channel,  "@" + user + " Command " + commandName +  " has been deleted");
+        twitchClient.getChat().sendMessage(getChannel(event),  "@" + getChannel(event) + " Command " + commandName +  " has been deleted");
     }
 
     private void handleCustomCommand(ChannelMessageEvent event) {
-        String channel = event.getChannel().getName();
-        String message = event.getMessage();
-
-        if (message == null || !message.startsWith("!") || message.length() < 2) {
+        if (getMessage(event) == null || !getMessage(event).startsWith("!") || getMessage(event).length() < 2) {
             return;
         }
 
-        String commandTrigger = message.split(" ", 2)[0].substring(1).toLowerCase();
+        String commandTrigger = getMessage(event).split(" ", 2)[0].substring(1).toLowerCase();
 
         if (customCommandsMap.containsKey(commandTrigger)) {
             String response = customCommandsMap.get(commandTrigger);
-            twitchClient.getChat().sendMessage(channel, response);
+            twitchClient.getChat().sendMessage(getChannel(event), response);
         }
     }
 
